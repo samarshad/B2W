@@ -1,12 +1,3 @@
-<View><Query><Where><And><And><Eq><FieldRef Name='Opportunity_x003a_IsClosed'/>
-<Value Type='Text'>No</Value></Eq>
-<Eq>
-<FieldRef Name='Manager_x0020_of_x0020_Person'/>
-<Value Type='Integer'><UserID/></Value>
-</Eq>
-</And>
-<Or Group='true'><Or>
-<Or>
 
 <Or>
 <Or>
