@@ -1,7 +1,10 @@
 
-
+<Or>
+<Or>
+<Or>
 <Contains><FieldRef Name='Opportunity_x003a_Account_x0020_'/>
-<Val
+<Value Type='Text'>{FilterText}</Value></Contains><Contains>
+<FieldRef Name='Opportunity_x003a_Opportunity_x01'/>
 <Value Type='Text'>{FilterText}</Value></Contains></Or>
 <Contains>
 <FieldRef Name='Opportunity_x003a_Smart_x0020_Op'/>
