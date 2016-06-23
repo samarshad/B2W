@@ -1,0 +1,12 @@
+<script src="/app/bid2win/SiteAssets/Scripts/jquery-1.11.3.min.js"></script>
+	<script type="text/javascript" language="javascript" src="../SiteAssets/Scripts/jquery.SPServices-2014.02.min.js"></script>  
+	<script src="/app/bid2win/SiteAssets/Scripts/datatables.js"></script>
+	<script src="/app/bid2win/SiteAssets/Scripts/customCommercialViews.js"></script>
+	<link rel="stylesheet" type="text/css" href="/app/bid2win/SiteAssets/Scripts/datatables.css">
+
+
+<div id="dvAllOpportunities" style="text-align:center"><img src="/app/bid2win/SiteAssets/Scripts/images/wait.gif" /></div>
+<table id="AllOpenOpp" class="display" width="100%"></table>
+
+
+

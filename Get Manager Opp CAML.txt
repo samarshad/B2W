@@ -1,0 +1,109 @@
+<View><Query><Where><And><And><Eq><FieldRef Name='Opportunity_x003a_IsClosed'/>
+<Value Type='Text'>No</Value></Eq>
+<Eq>
+<FieldRef Name='Manager_x0020_of_x0020_Person'/>
+<Value Type='Integer'><UserID/></Value>
+</Eq>
+</And>
+<Or Group='true'><Or>
+<Or>
+
+<Or>
+<Or>
+<Or>
+<Contains><FieldRef Name='Opportunity_x003a_Account_x0020_'/>
+<Value Type='Text'>{FilterText}</Value></Contains><Contains>
+<FieldRef Name='Opportunity_x003a_Opportunity_x01'/>
+<Value Type='Text'>{FilterText}</Value></Contains></Or>
+<Contains>
+<FieldRef Name='Opportunity_x003a_Smart_x0020_Op'/>
+<Value Type='Text'>{FilterText}</Value></Contains></Or>
+<Contains>
+<FieldRef Name='Opportunity_x003a_Account_x0020_0'/>
+<Value Type='Text'>{FilterText}</Value></Contains></Or>
+<Eq><FieldRef Name='Opportunity_x003a_Stage_x0020_Te'/><Value Type='Text'>{FilterText}</Value></Eq>
+</Or><Eq><FieldRef Name='Opportunity_x003a_Opportunity_x0'/>
+<Value Type='Text'>{FilterText}</Value></Eq></Or>
+<Eq>
+<FieldRef Name='Opportunity_x003a_Opportunity_x00'/><Value Type='Text'>{FilterText}</Value></Eq>
+</Or></And>
+</Where>
+<OrderBy><FieldRef Name='Role' Ascending='TRUE'/></OrderBy></Query></View>
+
+
+
+Where Current User is Manager
+================================
+<Query>
+<Where>
+     <Eq>
+        <FieldRef Name="Manager_x0020_of_x0020_Person" />
+        <Value Type="Integer">
+          <UserID />
+        </Value>
+      </Eq>
+</Where>
+</Query>
+
+
+Getting Tasks for user and group he blongs to
+===================================
+<Where>
+<Or><Eq><FieldRef Name='AssignedTo'/>
+<Value Type='Integer'><UserID Type='Integer'/></Value></Eq>
+<Membership Type='CurrentUserGroups'><FieldRef Name='AssignedTo'/></Membership>
+</Or>
+</Where>
+
+
+==================
+AND with a combined OR
+<Query>
+<OrderBy>
+  <FieldRef Name="Modified" Ascending="FALSE"></FieldRef>
+</OrderBy>
+<Where>
+  <And>
+    <Or>
+      <Eq>
+        <FieldRef Name="Title"></FieldRef>
+        <Value Type="Text">A1</Value>
+    </Eq>
+      <Eq>
+        <FieldRef Name="Title"></FieldRef>
+        <Value Type="Text">A11</Value>
+    </Eq>
+    </Or>
+      <Eq>
+        <FieldRef Name="Title"></FieldRef>
+        <Value Type="Text">A1</Value>
+    </Eq>
+  </And>
+</Where>
+</Query>
+
+==================
+<Query>
+<OrderBy>
+  <FieldRef Name="Modified" Ascending="FALSE"></FieldRef>
+</OrderBy>
+<Where>
+  <And>
+    <Or>
+      <Eq><FieldRef Name='AssignedTo'/>
+        <Value Type='Integer'><UserID Type='Integer'/></Value>
+     </Eq>
+     <Membership Type='CurrentUserGroups'><FieldRef Name='AssignedTo'/>
+     </Membership>
+    </Or>
+      <Eq>
+        <FieldRef Name="Title"></FieldRef>
+        <Value Type="Text">A1</Value>
+    </Eq>
+  </And>
+</Where>
+</Query>
+
+1. Create a Multiple List Query
+2. Compare with Manager Field
+

@@ -1,0 +1,881 @@
+var oppId = '';
+var curUserId= _spPageContextInfo.userId;
+var OppIdsArray =[];
+var employeeLoginNameArray = [];
+var empAndGroupNameArray = [];
+var oppListHash = {};
+var currentUserGroups = [];
+var isOffshoreUser = 0;
+var currentUserName = '';
+
+$(function () {
+
+
+
+SP.SOD.executeFunc('SP.js', null, function(){
+
+	GetGroupsForUser($().SPServices.SPGetCurrentUser()); //Add groups for current user.
+    $.each( currentUserGroups , function( i, val ) {
+    		if (val == 'OB Pricing Team Offshore')
+		       isOffshoreUser = 1;
+    });
+
+	if (isOffshoreUser == 1) 
+	{
+		currentUserName = $().SPServices.SPGetCurrentUser({fieldName: "Title",debug: false});
+		//currentUserName = 'Arshad Seyad Abdul';
+	}
+
+
+	GetOpportunities();
+	
+	/* Commented as part of hiding four webparts
+	empAndGroupNameArray.push($().SPServices.SPGetCurrentUser({fieldName: "Title",debug: false})); //Add current user
+	GetGroupsForUser($().SPServices.SPGetCurrentUser()); //Add groups for current user.
+	GetEmployeesForManager(); 
+	GetTeamOppsAssigned();
+	GetTeamProdsAssigned();
+	*/
+
+	//Debugging
+	/*
+	if ( $().SPServices.SPGetCurrentUser().indexOf('p630589') > -1 )
+	{
+
+		//GetOpportunities();
+		empAndGroupNameArray.push($().SPServices.SPGetCurrentUser({fieldName: "Title",debug: false})); //Add current user
+		GetGroupsForUser($().SPServices.SPGetCurrentUser()); //Add groups for current user.
+		GetEmployeesForManager(); //Add All Managers and groups.
+		
+		
+	    alert(employeeLoginNameArray.length); 
+	    alert(empAndGroupNameArray.length);
+	    $.each( empAndGroupNameArray, function( i, val ) {
+	       alert(val);
+	    });
+	    
+	    
+		GetTeamOppsAssigned();
+		GetTeamProdsAssigned();
+	}
+	*/
+
+})
+});
+
+
+
+/************* Start All Open Oppos**************/
+
+var dataSetAllOpps=[];
+var dataSetOpenOpps=[];
+var dataSetClosedOpps=[];
+
+function GetOpportunities()
+{
+
+     var clientContext = new SP.ClientContext.get_current();
+     var oppList = clientContext.get_web().get_lists().getByTitle('Opportunity');
+     var oppCaml = new SP.CamlQuery();     
+	 var camlString = "<View>" +
+   	    '<ViewFields>' +
+		'<FieldRef Name="ID"/>' +
+		'<FieldRef Name="SmtOppID"/>' +
+		'<FieldRef Name="OppName"/>' +
+		'<FieldRef Name="Account_x0020_Name"/>' +
+		'<FieldRef Name="Classification_x0020_Stage_x0020"/>' +
+		'<FieldRef Name="Account_x0020_Segment"/>' +
+		'<FieldRef Name="CommercialDecisionAssignedEscala"/>' + 
+		'<FieldRef Name="CommercialDecisionBy"/>' +
+		'<FieldRef Name="Market_x0020_Segment"/>' +
+		'<FieldRef Name="oppStatus"/>' +
+		'<FieldRef Name="Manual_x0020_Classification"/>' +
+		'<FieldRef Name="CommercialDecision"/>' +
+		'<FieldRef Name="CommercialReviewTeam"/>' +
+		'<FieldRef Name="CommercialEngagementInProgress"/>' +	
+		'<FieldRef Name="CommercialReviewRequestedBy"/>' +	
+		'<FieldRef Name="CommercialDecisionDate"/>' +		
+		'</ViewFields>';
+
+		
+	 //camlString += "<Query><Where><And><Eq> <FieldRef Name='oppStatus' /><Value Type='Text'>Commercial Approval</Value></Eq><Eq> <FieldRef Name='CommercialEngagementConducted' /><Value Type='Integer'>1</Value></Eq></And></Where></Query></View>";
+	 //camlString += "<Query><Where><Eq><FieldRef Name='CommercialEngagementConducted' /><Value Type='Integer'>1</Value></Eq></Where></Query></View>";	 
+	 camlString += "<Query><OrderBy><FieldRef Name='ID' Ascending='FALSE'/></OrderBy><Where><Eq><FieldRef Name='CommercialEngagementConducted' /><Value Type='Integer'>1</Value></Eq></Where></Query></View>";	 
+	 
+	 //camlString += "<Query><Where><Eq><FieldRef Name='CommercialDecisionAssignEscalate' /><Value Type='Integer'>1</Value></Eq></Where></Query></View>";	 
+	 
+	 oppCaml.set_datesInUtc(false);
+   	 oppCaml.set_viewXml(camlString);
+     dataSetAllOpps = oppList.getItems(oppCaml);
+     clientContext.load(dataSetAllOpps); 
+     clientContext.executeQueryAsync(
+				Function.createDelegate(this,function(){onQuerySucceededAllOppsDS();}),
+				Function.createDelegate(this, this.onQueryFailed));
+}
+
+function onQuerySucceededAllOppsDS() {
+	var listItemEnumerator ;
+	var oListItem;
+	var idIndex;
+	var assignedUser = '';
+	var requestedBy = '';
+	var oppIdIndex = 13;
+	var oppIdIndexClosed = 13;
+
+	listItemEnumerator = dataSetAllOpps.getEnumerator();
+    while (listItemEnumerator.moveNext())
+    {
+		
+        oListItem = listItemEnumerator.get_current();
+
+	    var innerArray = [];
+		innerArray.push(oListItem.get_item('SmtOppID'));
+		innerArray.push(oListItem.get_item('OppName'));
+		innerArray.push(oListItem.get_item('Account_x0020_Name'));
+		innerArray.push(oListItem.get_item('Classification_x0020_Stage_x0020'));
+		if (oListItem.get_item('Manual_x0020_Classification') != 'Unclassified')
+			innerArray.push(oListItem.get_item('Manual_x0020_Classification'));		
+		else
+			innerArray.push('');		
+		
+		innerArray.push(oListItem.get_item('Account_x0020_Segment'));
+		innerArray.push(oListItem.get_item('Market_x0020_Segment'));
+
+		if (oListItem.get_item('CommercialReviewTeam') != null) 
+			innerArray.push(oListItem.get_item('CommercialReviewTeam').get_lookupValue()); 
+		else
+			innerArray.push('');	
+
+		innerArray.push(oListItem.get_item('CommercialDecision'));
+		
+		if (oListItem.get_item('CommercialDecisionBy') != null) 
+			innerArray.push(oListItem.get_item('CommercialDecisionBy').get_lookupValue()); 
+		else
+			innerArray.push('');		
+			
+		if (oListItem.get_item('CommercialDecisionAssignedEscala') != null) 
+		 	innerArray.push(oListItem.get_item('CommercialDecisionAssignedEscala').get_lookupValue()); 
+		else
+			innerArray.push('');	
+		 	
+		
+		innerArray.push(oListItem.get_item('CommercialDecisionDate'));
+		requestedBy = (oListItem.get_item('CommercialReviewRequestedBy') != null) ? oListItem.get_item('CommercialReviewRequestedBy').get_lookupValue() : '';
+		innerArray.push(requestedBy);		
+		innerArray.push(oListItem.get_item('ID'));
+		
+		
+		if (isOffshoreUser == 1)
+		{
+			if (assignedUser == 'OB Pricing Team Offshore' || assignedUser == currentUserName)
+				dataSetOpenOpps.push(innerArray);
+		}
+		else
+		{
+	        if (oListItem.get_item('CommercialEngagementInProgress') == '1') //Inprogress
+	        {
+	        	if (oListItem.get_item('oppStatus') == 'Commercial Approval') 
+		            dataSetOpenOpps.push(innerArray);
+		    }
+	        else
+	            dataSetClosedOpps.push(innerArray);
+		}
+		
+	}
+	
+	$('#AllOpenOpp').DataTable( {
+	        data: dataSetOpenOpps,
+			deferRender: true,
+			info:true,
+			pagingType: "full_numbers",
+			initComplete: function(settings, json) {
+							$('#dvAllOpportunities').remove();
+				},
+	        columns: [
+	            { title: "Opportunity ID",
+				  render: function(data, type, row, meta){ 			
+									  			
+					return '<a target="_blank" onclick="OpenPopUpPage(\'new_OpportunityWorkspace.aspx?OPPID='+row[oppIdIndex]+'\', RefreshPage, 1200, 800); return false;" href="new_OpportunityWorkspace.aspx?OPPID='+row[oppIdIndex]+'">'+data+'</a>'}		
+				},
+	            { title: "Products Workspace",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" onclick="OpenPopUpPage(\'new_productworkspace.aspx?OPPID='+row[oppIdIndex]+'\', RefreshPage, 1200, 800); return false;" href="new_productworkspace.aspx?OPPID='+row[oppIdIndex]+'">'+data+'</a>'}		
+				},
+	            { title: "Customer Name",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" onclick="OpenPopUpPage(\'Customer Workspace.aspx?OPPID='+row[oppIdIndex]+'&CustName='+data+'\', RefreshPage, 1200, 800); return false;" href="Customer Workspace.aspx?OPPID='+row[oppIdIndex]+'&CustName='+data+'">'+data+'</a>'}		
+				},
+	            { title: "Opp Classification" },
+	            { title: "Manual Classification" },
+	            { title: "Segment" },
+	            { title: "Market Segment" },
+	            { title: "Routing team" },	
+		        { title: "Action" },
+	            { title: "Action By"},		        
+	            { title: "Assigned or Escalated To"},	            
+				/*{ title: "Decision By",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="mailto:'+data+'">'+data+'</a>'}		
+				},
+	            { title: "Assigned or Escalated To",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="mailto:'+data+'">'+data+'</a>'}		
+				},*/
+	            { title: "Last Action Date",
+				  render: function(data, type, row, meta){ 					
+				  		return data !== null ?    (new Date(data)).format("dd/MM/yy") : ''  
+					}		
+				},				
+	            { title: "Requested By"}				
+
+	        ]
+	    } );
+	    
+	$('#AllClosedOpp').DataTable( {
+	        data: dataSetClosedOpps,
+			deferRender: true,
+			info:true,
+			pagingType: "full_numbers",
+			initComplete: function(settings, json) {
+							$('#dvClosedOpportunities').remove();
+				},
+	        columns: [
+	            { title: "Opportunity ID",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" onclick="OpenPopUpPage(\'new_OpportunityWorkspace.aspx?OPPID='+row[oppIdIndexClosed]+'\', RefreshPage, 1200, 800); return false;" href="new_OpportunityWorkspace.aspx?OPPID='+row[oppIdIndexClosed]+'">'+data+'</a>'}		
+				},
+	            { title: "Products Workspace",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" onclick="OpenPopUpPage(\'new_productworkspace.aspx?OPPID='+row[oppIdIndexClosed]+'\', RefreshPage, 1200, 800); return false;" href="new_productworkspace.aspx?OPPID='+row[oppIdIndexClosed]+'">'+data+'</a>'}		
+				},
+	            { title: "Customer Name",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" onclick="OpenPopUpPage(\'Customer Workspace.aspx?OPPID='+row[oppIdIndexClosed]+'&CustName='+data+'\', RefreshPage, 1200, 800); return false;" href="Customer Workspace.aspx?OPPID='+row[oppIdIndexClosed]+'&CustName='+data+'">'+data+'</a>'}		
+				},
+	            { title: "Opp Classification" },
+	            { title: "Manual Classification" },
+	            { title: "Segment" },
+	            { title: "Market Segment" },
+	            { title: "Routing team" },	            
+  		        { title: "Action" },
+	            { title: "Action By"},		        
+	            { title: "Assigned or Escalated To"},	            
+	            { title: "Last Action Date",
+				  render: function(data, type, row, meta){ 					
+				  		return data !== null ?    (new Date(data)).format("dd/MM/yy") : ''  
+					}		
+				},							
+	            { title: "Requested By"}				
+
+	        ]
+	    } );
+	    
+    	GetOpportunitiesAtProductLevel();
+
+
+}
+/************* End All Oppos**************/
+
+/************* Start - Opportunities Product Level **************/
+
+var dataSetOppProductLevel=[];	
+var dataSetOppProductLevelFiltered=[];	
+function   GetOpportunitiesAtProductLevel()
+{
+	var clientContext = new SP.ClientContext.get_current();
+    var prodList = clientContext.get_web().get_lists().getByTitle('Product');
+    var prodCaml = new SP.CamlQuery();
+    var camlString = "<View>" +
+   	    '<ViewFields>' +
+   	    '<FieldRef Name="Title"/>' +
+   	    '<FieldRef Name="Product_ID"/>' +
+		'<FieldRef Name="Opportunity_x003a_ID"/>' +
+		'<FieldRef Name="Opportunity_x003a_Smart_x0020_Op"/>' +
+		'<FieldRef Name="Opportunity_x003a_Title"/>' +
+		'<FieldRef Name="Opportunity_x003a_Account_x0020_"/>' + //Account name
+		'<FieldRef Name="Opportunity_x003a_Opportunity_x0"/>' +  //Classificatoin Stage Classification
+		'<FieldRef Name="Opportunity_x003a_ManualClassifi"/>' +  //Manual Classification
+		'<FieldRef Name="Opportunity_x003a_Account_x0020_0"/>' + // Account segment
+		'<FieldRef Name="Opportunity_x003a_Market_x0020_S"/>' +
+		'<FieldRef Name="DecisionAssignedEscalatedTo"/>' +
+		'<FieldRef Name="DecisionBy"/>' +
+		'<FieldRef Name="RequestedBy"/>' +
+		'<FieldRef Name="Opportunity_x003a_Bid2Win_x0020_"/>' +
+		'<FieldRef Name="CommercialDecisionDate"/>' +
+		//'<FieldRef Name="Opportunity_x003a_Opportunity_x00"/>' + //Opp Status
+		'<FieldRef Name="Opportunity_x003a_CommercialEnga"/>' + //Engagement In Progress
+		'<FieldRef Name="Decision"/>' +		
+		'</ViewFields>';
+
+    //camlString += "<Query><Where><Eq><FieldRef Name='RequestStatus' /><Value Type='Text'>ReviewInProgress</Value></Eq></Where></Query></View>";	 
+    //camlString += "<Query><Where><Eq><FieldRef Name='DecisionAssignEscalateWFInProgre' /><Value Type='Integer'>1</Value></Eq></Where></Query></View>";	 
+    camlString += "<Query><Where><Or><Eq><FieldRef Name='RequestStatus' /><Value Type='Text'>ReviewInProgress</Value></Eq><Eq><FieldRef Name='RequestStatus' /><Value Type='Text'>Requested</Value></Eq></Or></Where></Query></View>";	 
+    //camlString += "<Query><Where><Eq><FieldRef Name='Opportunity_x003a_CommercialEnga0' /><Value Type='Text'>Yes</Value></Eq></Where></Query></View>";	 
+	//camlString += "<Query><Where><Eq><FieldRef Name='Opportunity_x003a_CommercialEnga' /><Value Type='Text'>Yes</Value></Eq></Where></Query></View>";	     
+	//camlString += "<Query><Where><Eq><FieldRef Name='Title' /><Value Type='Text'>Multiline</Value></Eq></Where></Query></View>";	 
+
+	prodCaml.set_datesInUtc(false);  
+    prodCaml.set_viewXml(camlString);
+    dataSetOppProductLevel = prodList.getItems(prodCaml);
+    clientContext.load(dataSetOppProductLevel);
+    clientContext.executeQueryAsync(
+               Function.createDelegate(this, function () { onQuerySucceededAllOppsProductLevelDS(); }),
+               Function.createDelegate(this, this.onQueryFailed));	
+}
+
+function onQuerySucceededAllOppsProductLevelDS() {
+    var listItemEnumerator;
+    var oListItem;
+    var idIndex;
+    var requestedBy ='';
+	var b2wDate ='';
+	var classification ='';
+	var manClassification = '';
+	var accountSeg='';
+	var marketSeg='';
+	var requestedBy = '';
+	var decisionBy = '';
+	var assignedUser = '';
+	var decision = '';
+	var oppIdIndex = 13;
+
+	listItemEnumerator = dataSetOppProductLevel.getEnumerator();
+    while (listItemEnumerator.moveNext()) {
+
+        oListItem = listItemEnumerator.get_current();
+
+        var innerArray = [];
+		innerArray.push(oListItem.get_item('Opportunity_x003a_Smart_x0020_Op').get_lookupValue());
+		//innerArray.push(oListItem.get_item('Opportunity_x003a_Title').get_lookupValue());		//Opp Name
+		innerArray.push(oListItem.get_item('Title'));		
+		innerArray.push(oListItem.get_item('Opportunity_x003a_Account_x0020_').get_lookupValue());
+		classification = (oListItem.get_item('Opportunity_x003a_Opportunity_x0') != null) ? oListItem.get_item('Opportunity_x003a_Opportunity_x0').get_lookupValue() : '';
+		innerArray.push(classification);
+		manClassification = (oListItem.get_item('Opportunity_x003a_ManualClassifi') != null && oListItem.get_item('Opportunity_x003a_ManualClassifi').get_lookupValue() != 'Unclassified' ) ? oListItem.get_item('Opportunity_x003a_ManualClassifi').get_lookupValue() : '';
+		innerArray.push(manClassification);		
+		accountSeg = (oListItem.get_item('Opportunity_x003a_Account_x0020_0') != null) ? oListItem.get_item('Opportunity_x003a_Account_x0020_0').get_lookupValue() : '';
+		innerArray.push(accountSeg);
+		marketSeg = (oListItem.get_item('Opportunity_x003a_Market_x0020_S') != null) ? oListItem.get_item('Opportunity_x003a_Market_x0020_S').get_lookupValue() : '';
+		innerArray.push(marketSeg);
+		innerArray.push(getRoutingTeam(oListItem.get_item('Opportunity_x003a_ID').get_lookupId()));	
+		decision = oListItem.get_item('Decision');
+		innerArray.push(decision);
+		decisionBy = (oListItem.get_item('DecisionBy') != null) ? oListItem.get_item('DecisionBy').get_lookupValue() : '';
+		innerArray.push(decisionBy);		
+		assignedUser = (oListItem.get_item('DecisionAssignedEscalatedTo') != null) ? oListItem.get_item('DecisionAssignedEscalatedTo').get_lookupValue() : '';
+		innerArray.push(assignedUser );		
+		innerArray.push(oListItem.get_item('CommercialDecisionDate'));
+		requestedBy = (oListItem.get_item('RequestedBy') != null) ? oListItem.get_item('RequestedBy').get_lookupValue() : '';
+		innerArray.push(requestedBy);		
+
+		innerArray.push(oListItem.get_item('Opportunity_x003a_ID').get_lookupId()); //Opportunity Id
+		
+		if (isOffshoreUser == 1)
+		{
+			if (assignedUser == 'OB Pricing Team Offshore' || assignedUser == currentUserName)
+				dataSetOppProductLevelFiltered.push(innerArray);
+		}
+		else
+	    	dataSetOppProductLevelFiltered.push(innerArray);
+	        
+    }
+
+    $('#AllOpenOppProdLevel').DataTable({
+        data: dataSetOppProductLevelFiltered,
+        deferRender: true,
+        info: true,
+        pagingType: "full_numbers",
+        initComplete: function (settings, json) {
+            $('#dvAllOpenOppProdLevel').remove();
+        },
+        columns: [
+	            { title: "Opportunity ID",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" onclick="OpenPopUpPage(\'new_OpportunityWorkspace.aspx?OPPID='+row[oppIdIndex]+'\', RefreshPage, 1200, 800); return false;" href="new_OpportunityWorkspace.aspx?OPPID='+row[oppIdIndex]+'">'+data+'</a>'}		
+				},
+	            { title: "Products Workspace",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" onclick="OpenPopUpPage(\'new_productworkspace.aspx?OPPID='+row[oppIdIndex]+'\', RefreshPage, 1200, 800); return false;" href="new_productworkspace.aspx?OPPID='+row[oppIdIndex]+'">'+data+'</a>'}		
+				},
+	            { title: "Customer Name",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" onclick="OpenPopUpPage(\'Customer Workspace.aspx?OPPID='+row[oppIdIndex]+'&CustName='+data+'\', RefreshPage, 1200, 800); return false;" href="Customer Workspace.aspx?OPPID='+row[oppIdIndex]+'&CustName='+data+'">'+data+'</a>'}		
+				},
+	            { title: "Opp Classification" },
+	            { title: "Manual Classification" },
+	            { title: "Segment" },
+	            { title: "Market Segment" },
+	            { title: "Routing Team" },	            	            
+	            { title: "Action" },	            
+	            { title: "Action By"},
+	            { title: "Assigned or Escalated To"},
+	            { title: "Last Action Date",
+				  render: function(data, type, row, meta){ 					
+				  		return data !== null ?    (new Date(data)).format("dd/MM/yy") : ''  
+					}		
+				},								            
+	            { title: "Requested By"}
+        ]
+    });
+
+    
+
+}
+
+function onQueryFailed(sender, args) {
+    alert('Request failed. ' + args.get_message() + '\n' + args.get_stackTrace());
+}
+
+
+function getRoutingTeam(opportunityId)
+{
+	debugger;
+	for (i = 0; i < dataSetOpenOpps.length; i++) { 
+		if (opportunityId == dataSetOpenOpps[i][13])
+			return dataSetOpenOpps[i][6]; //Routing team
+	}
+
+	for (i = 0; i < dataSetClosedOpps.length; i++) { 
+		if (opportunityId == dataSetClosedOpps[i][13])
+			return dataSetClosedOpps[i][6]; //Routing team
+	}
+	
+	return '';
+	
+
+}
+
+
+function GetGroupsForUser(loginId) {
+
+    $().SPServices({
+        operation: "GetGroupCollectionFromUser",
+        //userLoginName: $().SPServices.SPGetCurrentUser(),  
+        userLoginName: loginId,
+        async: false,
+        completefunc: function (xData, Status) {
+            $(xData.responseXML).find("Group").each(function () {
+                if ($.inArray($(this).attr("Name"), empAndGroupNameArray) == -1)
+                    currentUserGroups.push($(this).attr("Name"));
+            });
+        }
+    });
+
+}
+
+
+/************* End - Opportunities Product Level **************/
+
+
+
+/**********Get Opportunity Open/Closed Assigned Start**********/
+/*
+var dataSetOpenAssignedOpps = [];
+var dataSetClosedAssignedOpps = [];
+var dataSetAllAssignedOpps = [];
+
+function GetTeamOppsAssigned()
+{
+	var clientContext = new SP.ClientContext.get_current();
+    var oppList = clientContext.get_web().get_lists().getByTitle('Opportunity');
+    var oppCaml = new SP.CamlQuery();
+    var camlString = "<View>" +
+   	    '<ViewFields>' +
+		'<FieldRef Name="ID"/>' +
+		'<FieldRef Name="SmtOppID"/>' +
+		'<FieldRef Name="OppName"/>' +
+		'<FieldRef Name="Account_x0020_Name"/>' +
+		'<FieldRef Name="Classification_x0020_Stage_x0020"/>' +
+		'<FieldRef Name="Account_x0020_Segment"/>' +
+		'<FieldRef Name="Market_x0020_Segment"/>' +
+		'<FieldRef Name="Opportunity_x0020_Owner"/>' +
+		'<FieldRef Name="Solution_x0020_Owner"/>' +
+		'<FieldRef Name="b2winidate"/>' +
+		'<FieldRef Name="oppStatus"/>' +
+		'<FieldRef Name="CommercialReviewTeam"/>' +
+		'</ViewFields><Query><Where>';
+
+
+    if (empAndGroupNameArray.length == 1)
+        camlString += "<Eq><FieldRef Name='CommercialDecisionAssignedEscala' /><Value Type='User'>" + empAndGroupNameArray[0] + "</Value></Eq>";
+    else {
+
+        $.each(empAndGroupNameArray, function (index, value) {
+            if (index == (empAndGroupNameArray.length - 1))
+                camlString += "<Eq><FieldRef Name='CommercialDecisionAssignedEscala' /><Value Type='User'>" + value + "</Value></Eq>";
+            else
+                camlString += "<Or><Eq><FieldRef Name='CommercialDecisionAssignedEscala' /><Value Type='User'>" + value + "</Value></Eq>";
+        });
+
+        $.each(empAndGroupNameArray, function (index, value) {
+            if (index != 0) //Exclude one
+                camlString += "</Or>";
+        });
+
+    }
+    camlString += "</Where></Query></View>";
+	oppCaml.set_datesInUtc(false);    
+    oppCaml.set_viewXml(camlString);
+    dataSetAllAssignedOpps = oppList.getItems(oppCaml);
+    clientContext.load(dataSetAllAssignedOpps);
+    clientContext.executeQueryAsync(
+               Function.createDelegate(this, function () { onQuerySucceededCloseOpenAssignedOpportunityDS(); }),
+               Function.createDelegate(this, this.onQueryFailed));	
+	
+	
+}
+
+function onQuerySucceededCloseOpenAssignedOpportunityDS() {
+    var listItemEnumerator;
+    var oListItem;
+    var idIndex;
+
+	listItemEnumerator = dataSetAllAssignedOpps.getEnumerator();
+
+    while (listItemEnumerator.moveNext()) {
+
+        oListItem = listItemEnumerator.get_current();
+
+        var innerArray = [];
+		innerArray.push(oListItem.get_item('SmtOppID'));
+		innerArray.push(oListItem.get_item('OppName'));
+		innerArray.push(oListItem.get_item('Account_x0020_Name'));
+		innerArray.push(oListItem.get_item('Classification_x0020_Stage_x0020'));
+		innerArray.push(oListItem.get_item('Account_x0020_Segment'));
+		innerArray.push(oListItem.get_item('Market_x0020_Segment'));
+		if (oListItem.get_item('CommercialReviewTeam') != null) 
+			innerArray.push(oListItem.get_item('CommercialReviewTeam').get_lookupValue()); 
+		else
+			innerArray.push('');			
+		
+		innerArray.push(oListItem.get_item('Opportunity_x0020_Owner').get_lookupValue());
+		innerArray.push(oListItem.get_item('Solution_x0020_Owner').get_lookupValue());
+		innerArray.push(oListItem.get_item('b2winidate'));
+		innerArray.push(oListItem.get_item('ID'));
+        
+        if (oListItem.get_item('oppStatus') == 'Commercial Approval')
+            dataSetOpenAssignedOpps.push(innerArray);
+        else
+            dataSetClosedAssignedOpps.push(innerArray);
+
+    }
+
+    $('#OpenOppReviewAssigned').DataTable({
+        data: dataSetOpenAssignedOpps,
+        deferRender: true,
+        info: true,
+        pagingType: "full_numbers",
+        initComplete: function (settings, json) {
+            $('#dvOpenOppReviewAssigned').remove();
+        },
+        columns: [
+	            { title: "Opportunity ID",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="new_OpportunityWorkspace.aspx?OPPID='+row[10]+'">'+data+'</a>'}		
+				},
+	            { title: "Products Workspace",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="new_productworkspace.aspx?OPPID='+row[10]+'">'+data+'</a>'}		
+				},
+	            { title: "Customer Name",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="Customer Workspace.aspx?OPPID='+row[10]+'&CustName='+data+'">'+data+'</a>'}		
+				},
+	            { title: "Opp Classification" },
+	            { title: "Segment" },
+	            { title: "Market Segment" },
+	            { title: "Routing team" },	            
+	            { title: "Opportunity Owner",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="mailto:'+data+'">'+data+'</a>'}		
+				},
+				{ title: "Solution Owner",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="mailto:'+data+'">'+data+'</a>'}		
+				},
+	            { title: "Bid2Win Initiate Date",
+				  render: function(data, type, row, meta){ 					
+				  		return data !== null ?    (new Date(data)).format("dd/MM/yy") : ''  
+					}		
+				}
+
+        ]
+    });
+
+    $('#ClosedOppReviewAssigned').DataTable({
+        data: dataSetClosedAssignedOpps,
+        deferRender: true,
+        info: true,
+        pagingType: "full_numbers",
+        initComplete: function (settings, json) {
+            $('#dvClosedOppReviewAssigned').remove();
+        },
+        columns: [
+	            { title: "Opportunity ID",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="new_OpportunityWorkspace.aspx?OPPID='+row[10]+'">'+data+'</a>'}		
+				},
+	            { title: "Products Workspace",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="new_productworkspace.aspx?OPPID='+row[10]+'">'+data+'</a>'}		
+				},
+	            { title: "Customer Name",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="Customer Workspace.aspx?OPPID='+row[10]+'&CustName='+data+'">'+data+'</a>'}		
+				},
+	            { title: "Opp Classification" },
+	            { title: "Segment" },
+	            { title: "Market Segment" },
+	            { title: "Routing team" },	            
+	            { title: "Opportunity Owner",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="mailto:'+data+'">'+data+'</a>'}		
+				},
+				{ title: "Solution Owner",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="mailto:'+data+'">'+data+'</a>'}		
+				},
+	            { title: "Bid2Win Initiate Date",
+				  render: function(data, type, row, meta){ 					
+				  		return data !== null ?    (new Date(data)).format("dd/MM/yy") : ''  
+					}		
+				}
+        ]
+    });
+    
+}
+*/
+/**********Get Opportunity Open/Closed Assigned End**********/
+
+/**********Common Functions Start**********/
+/*
+function GetEmployeesForManager() {
+    $().SPServices({
+        operation: "GetListItems",
+        async: false,
+        listName: "Opportunity Team",
+        CAMLViewFields: "<ViewFields><FieldRef Name='People' /><FieldRef Name='Opportunity_x003a_Opportunity_x01' /></ViewFields>",
+        CAMLQuery: "<Query><Where><Eq><FieldRef Name='Manager_x0020_of_x0020_Person' /><Value Type='Integer'><UserID/></Value></Eq></Where></Query>",
+        CAMLQueryOptions: "<QueryOptions><ExpandUserField>True</ExpandUserField></QueryOptions>",
+        completefunc: function (xData, Status) {
+
+            $(xData.responseXML).SPFilterNode("z:row").each(function () {
+
+                if ($.inArray($(this).attr("ows_Person").split(',#')[1], employeeLoginNameArray) == -1) { //Avoid calling it if the same employee is set multiple times in the Opportunity team list.
+                	debugger;
+                    employeeLoginNameArray.push($(this).attr("ows_Person").split(',#')[1]);
+                    empAndGroupNameArray.push($(this).attr("ows_Person").split(',#')[4]); //Used in the filter for AssignedTo from workflow tasks list
+                    GetGroupsForUser($(this).attr("ows_Person").split(',#')[1]);
+                    //oppListHash[$(this).attr("ows_Opportunity_x003a_Opportunity_x01").split(';#')[0]] = $(this).attr("ows_Opportunity_x003a_Opportunity_x01").split(';#')[1];
+                }
+                
+            });
+        }
+    });
+}
+*/
+/*
+Populate GroupList with all groups related to the manager employees
+*/
+/*
+function GetGroupsForUser(loginId) {
+
+    $().SPServices({
+        operation: "GetGroupCollectionFromUser",
+        //userLoginName: $().SPServices.SPGetCurrentUser(),  
+        userLoginName: loginId,
+        async: false,
+        completefunc: function (xData, Status) {
+            $(xData.responseXML).find("Group").each(function () {
+                if ($.inArray($(this).attr("Name"), empAndGroupNameArray) == -1)
+                    empAndGroupNameArray.push($(this).attr("Name"));
+            });
+        }
+    });
+
+}
+*/
+
+/**********Common Functions End **********/
+
+
+/**********Get Product Open/Closed Assigned Start**********/
+/*
+var dataSetOpenAssignedProducts = [];
+var dataSetClosedAssignedProducts = [];
+var dataSetAllAssignedProducts = [];
+
+
+function GetTeamProdsAssigned()
+{
+	
+	var clientContext = new SP.ClientContext.get_current();
+    var oppList = clientContext.get_web().get_lists().getByTitle('Product');
+    var oppCaml = new SP.CamlQuery();
+    var camlString = "<View>" +
+   	    '<ViewFields>' +
+   	    '<FieldRef Name="Title"/>' +
+   	    '<FieldRef Name="Product_ID"/>' +
+		'<FieldRef Name="Opportunity_x003a_ID"/>' +
+		'<FieldRef Name="Opportunity_x003a_Smart_x0020_Op"/>' +
+		'<FieldRef Name="Opportunity_x003a_Title"/>' +
+		'<FieldRef Name="Opportunity_x003a_Account_x0020_"/>' + //Account name
+		'<FieldRef Name="Opportunity_x003a_Opportunity_x0"/>' +  //Classificatoin Stage Classification
+		'<FieldRef Name="Opportunity_x003a_Account_x0020_0"/>' + // Account segment
+		'<FieldRef Name="Opportunity_x003a_Market_x0020_S"/>' +
+		'<FieldRef Name="RequestedBy"/>' +
+		'<FieldRef Name="Opportunity_x003a_Bid2Win_x0020_"/>' +
+		'<FieldRef Name="Opportunity_x003a_Opportunity_x00"/>' + //Opp Status
+		'<FieldRef Name="Opportunity_x003a_CommercialEnga"/>' + //Engagement Required
+		'</ViewFields><Query><Where>';
+
+
+    if (empAndGroupNameArray.length == 1)
+        camlString += "<Eq><FieldRef Name='DecisionAssignedEscalatedTo' /><Value Type='User'>" + empAndGroupNameArray[0] + "</Value></Eq>";
+    else {
+
+        $.each(empAndGroupNameArray, function (index, value) {
+            if (index == (empAndGroupNameArray.length - 1))
+                camlString += "<Eq><FieldRef Name='DecisionAssignedEscalatedTo' /><Value Type='User'>" + value + "</Value></Eq>";
+            else
+                camlString += "<Or><Eq><FieldRef Name='DecisionAssignedEscalatedTo' /><Value Type='User'>" + value + "</Value></Eq>";
+        });
+
+        $.each(empAndGroupNameArray, function (index, value) {
+            if (index != 0) //Exclude one
+                camlString += "</Or>";
+        });
+
+    }
+    camlString += "</Where></Query></View>";
+	oppCaml.set_datesInUtc(false);    
+    oppCaml.set_viewXml(camlString);
+    dataSetAllAssignedProducts = oppList.getItems(oppCaml);
+    clientContext.load(dataSetAllAssignedProducts);
+    clientContext.executeQueryAsync(
+               Function.createDelegate(this, function () { onQuerySucceededCloseOpenAssignedProductDS(); }),
+               Function.createDelegate(this, this.onQueryFailed));	
+	
+	
+}
+
+function onQuerySucceededCloseOpenAssignedProductDS() {
+    var listItemEnumerator;
+    var oListItem;
+    var idIndex;
+    var requestedBy ='';
+	var b2wDate ='';
+	var classification ='';
+	var accountSeg='';
+	var marketSeg='';
+	var requestedBy = '';
+	var status;
+
+
+	listItemEnumerator = dataSetAllAssignedProducts.getEnumerator();
+
+    while (listItemEnumerator.moveNext()) {
+
+        oListItem = listItemEnumerator.get_current();
+
+        var innerArray = [];
+        innerArray.push(oListItem.get_item('Title'));
+        innerArray.push(oListItem.get_item('Product_ID'));
+		requestedBy = (oListItem.get_item('RequestedBy') != null) ? oListItem.get_item('RequestedBy').get_lookupValue() : '';
+		innerArray.push(requestedBy);		
+		innerArray.push(oListItem.get_item('Opportunity_x003a_Smart_x0020_Op').get_lookupValue());
+		innerArray.push(oListItem.get_item('Opportunity_x003a_Title').get_lookupValue());		
+		innerArray.push(oListItem.get_item('Opportunity_x003a_Account_x0020_').get_lookupValue());
+		classification = (oListItem.get_item('Opportunity_x003a_Opportunity_x0') != null) ? oListItem.get_item('Opportunity_x003a_Opportunity_x0').get_lookupValue() : '';
+		innerArray.push(classification);
+		accountSeg = (oListItem.get_item('Opportunity_x003a_Account_x0020_0') != null) ? oListItem.get_item('Opportunity_x003a_Account_x0020_0').get_lookupValue() : '';
+		innerArray.push(accountSeg);
+		marketSeg = (oListItem.get_item('Opportunity_x003a_Market_x0020_S') != null) ? oListItem.get_item('Opportunity_x003a_Market_x0020_S').get_lookupValue() : '';
+		innerArray.push(marketSeg);
+		innerArray.push(oListItem.get_item('Opportunity_x003a_ID').get_lookupId()); //Opportunity Id
+        
+        debugger;
+        if (oListItem.get_item('Opportunity_x003a_CommercialEnga').get_lookupValue() == '1')
+        {
+        	status = oListItem.get_item('Opportunity_x003a_Opportunity_x00').get_lookupValue();
+	        if ( status == 'Commercial Approval')  //Opp Status Comparision
+	            dataSetOpenAssignedProducts.push(innerArray);
+	        
+	        if (status != 'Commercial Approval' && status != 'Approval')  //Opp Status Comparision
+	            dataSetClosedAssignedProducts.push(innerArray);
+        }
+
+    }
+
+    $('#OpenProdReviewAssigned').DataTable({
+        data: dataSetOpenAssignedProducts,
+        deferRender: true,
+        info: true,
+        pagingType: "full_numbers",
+        initComplete: function (settings, json) {
+            $('#dvOpenProdReviewAssigned').remove();
+        },
+        columns: [
+	            { title: "Product" },
+	            { title: "Product ID" },
+	            { title: "Requested By"},
+	            { title: "Opportunity ID",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="new_OpportunityWorkspace.aspx?OPPID='+row[9]+'">'+data+'</a>'}		
+				},
+	            { title: "Products Workspace",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="new_productworkspace.aspx?OPPID='+row[9]+'">'+data+'</a>'}		
+				},
+	            { title: "Customer Name",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="Customer Workspace.aspx?OPPID='+row[9]+'&CustName='+data+'">'+data+'</a>'}		
+				},
+	            { title: "Opp Classification" },
+	            { title: "Segment" },
+	            { title: "Market Segment" }
+        ]
+    });
+
+    $('#ClosedProdReviewAssigned').DataTable({
+        data: dataSetClosedAssignedProducts,
+        deferRender: true,
+        info: true,
+        pagingType: "full_numbers",
+        initComplete: function (settings, json) {
+            $('#dvClosedProdReviewAssigned').remove();
+        },
+        columns: [
+	            { title: "Product" },
+	            { title: "Product ID" },
+	            { title: "Requested By"},
+	            { title: "Opportunity ID",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="new_OpportunityWorkspace.aspx?OPPID='+row[9]+'">'+data+'</a>'}		
+				},
+	            { title: "Products Workspace",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="new_productworkspace.aspx?OPPID='+row[9]+'">'+data+'</a>'}		
+				},
+	            { title: "Customer Name",
+				  render: function(data, type, row, meta){ 					
+					return '<a target="_blank" href="Customer Workspace.aspx?OPPID='+row[9]+'&CustName='+data+'">'+data+'</a>'}		
+				},
+	            { title: "Opp Classification" },
+	            { title: "Segment" },
+	            { title: "Market Segment" }
+
+        ]
+    });
+    
+
+}
+*/
+
+/**********Get Product Open/Closed Assigned End**********/
+
+
+
+
+
+
